@@ -1,453 +1,792 @@
-const transcriptEl = document.getElementById('transcript');
-const startBtn = document.getElementById('startRecording');
-const stopBtn = document.getElementById('stopRecording');
-const statusEl = document.getElementById('recordingStatus');
-const heroDuration = document.getElementById('heroDuration');
-const heroWordCount = document.getElementById('heroWordCount');
-const statWords = document.getElementById('statWords');
-const statSections = document.getElementById('statSections');
-const statLastTag = document.getElementById('statLastTag');
-const tagList = document.getElementById('tagList');
-const highlightBtn = document.getElementById('highlightButton');
-const clearBtn = document.getElementById('clearButton');
-const cacheToggle = document.getElementById('cacheToggle');
-const suggestionsList = document.getElementById('suggestions');
-const summaryBtn = document.getElementById('summaryButton');
-const summaryOutput = document.getElementById('summaryOutput');
-const summaryTone = document.getElementById('summaryTone');
-const quizBtn = document.getElementById('quizButton');
-const quizOutput = document.getElementById('quizOutput');
-const quizLevel = document.getElementById('quizLevel');
-const questionBtn = document.getElementById('questionButton');
-const questionInput = document.getElementById('questionInput');
-const questionOutput = document.getElementById('questionOutput');
-const gameBtn = document.getElementById('gameButton');
-const gameOutput = document.getElementById('gameOutput');
-const toastEl = document.getElementById('toast');
-const downloadMarkdownBtn = document.getElementById('downloadMarkdown');
-const downloadJSONBtn = document.getElementById('downloadJSON');
-const exportBtn = document.getElementById('exportButton');
-const heroChapter = document.getElementById('heroChapter');
+const elements = {
+  recordButton: document.getElementById('recordButton'),
+  stopButton: document.getElementById('stopButton'),
+  exportButton: document.getElementById('exportButton'),
+  tagButton: document.getElementById('tagButton'),
+  clearButton: document.getElementById('clearButton'),
+  transcript: document.getElementById('transcript'),
+  tagList: document.getElementById('tagList'),
+  statDuration: document.getElementById('statDuration'),
+  statWords: document.getElementById('statWords'),
+  statSections: document.getElementById('statSections'),
+  statLastTag: document.getElementById('statLastTag'),
+  suggestionList: document.getElementById('suggestionList'),
+  summaryTone: document.getElementById('summaryTone'),
+  summaryOutput: document.getElementById('summaryOutput'),
+  quizCount: document.getElementById('quizCount'),
+  quizOutput: document.getElementById('quizOutput'),
+  questionInput: document.getElementById('questionInput'),
+  questionOutput: document.getElementById('questionOutput'),
+  gamesOutput: document.getElementById('gamesOutput'),
+  summaryButton: document.getElementById('summaryButton'),
+  quizButton: document.getElementById('quizButton'),
+  questionButton: document.getElementById('questionButton'),
+  gamesButton: document.getElementById('gamesButton'),
+  sessionList: document.getElementById('sessionList'),
+  toast: document.getElementById('toast'),
+  recordingBadge: document.getElementById('recordingBadge'),
+  sessionStatus: document.getElementById('sessionStatus'),
+  meterDuration: document.getElementById('meterDuration'),
+  meterWords: document.getElementById('meterWords'),
+  meterTags: document.getElementById('meterTags'),
+  themeToggle: document.getElementById('themeToggle'),
+  year: document.getElementById('year'),
+  waveform: document.getElementById('waveform')
+};
 
-let recognition;
-let isRecording = false;
-let startTimestamp;
-let recordingInterval;
-let cachedResponses = new Map();
-let tags = [];
+const state = {
+  recognition: null,
+  isRecording: false,
+  transcript: '',
+  interim: '',
+  tags: [],
+  startTime: null,
+  timerInterval: null,
+  waveAnimation: null,
+  backendAvailable: false,
+  sessionId: null,
+  cache: loadCache(),
+  sessions: loadSessions(),
+  backendId: null,
+  lastSuggestionUpdate: 0
+};
 
-const SUGGESTION_SETS = [
-  [
-    'Scindez la séance en sections et ajoutez un résumé par partie.',
-    'Repérez les termes clés répétés pour bâtir un glossaire.',
-    'Notez les questions posées par le professeur pour générer des quiz.'
-  ],
-  [
-    'Ajoutez un tag « examen » lorsque la notion tombe fréquemment.',
-    'Ajoutez un timestamp pour chaque démonstration importante.',
-    'Demandez un quiz adaptatif pour vérifier votre compréhension.'
-  ],
-  [
-    'Générez une fiche de synthèse après chaque séance.',
-    'Créez un jeu de flashcards pour mémoriser les définitions.',
-    'Partagez le résumé aux camarades via l’export Markdown.'
-  ]
-];
+const STORAGE_KEYS = {
+  sessions: 'omega.sessions',
+  cache: 'omega.cache',
+  theme: 'omega.theme'
+};
 
-function showToast(message, duration = 2800) {
-  toastEl.textContent = message;
-  toastEl.classList.add('show');
-  setTimeout(() => toastEl.classList.remove('show'), duration);
+function loadSessions() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEYS.sessions) || '[]');
+  } catch (error) {
+    console.warn('Impossible de charger les sessions', error);
+    return [];
+  }
 }
 
-function updateHeroStats() {
-  if (!startTimestamp) return;
-  const elapsed = Math.floor((Date.now() - startTimestamp) / 1000);
-  const minutes = String(Math.floor(elapsed / 60)).padStart(1, '0');
-  const seconds = String(elapsed % 60).padStart(2, '0');
-  heroDuration.textContent = `${minutes}:${seconds}`;
+function saveSessions() {
+  localStorage.setItem(STORAGE_KEYS.sessions, JSON.stringify(state.sessions));
 }
 
-function updateWordStats() {
-  const text = transcriptEl.value.trim();
-  const wordCount = text ? text.split(/\s+/).length : 0;
-  heroWordCount.textContent = wordCount;
-  statWords.textContent = wordCount;
-  const sections = text ? text.split(/\n\n+/).length : 0;
-  statSections.textContent = sections;
+function loadCache() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEYS.cache) || '{}');
+  } catch (error) {
+    console.warn('Impossible de charger le cache', error);
+    return {};
+  }
 }
 
-function addTag(label) {
-  if (!label) return;
-  tags.push({ label, createdAt: new Date() });
-  renderTags();
-  statLastTag.textContent = label;
-  showToast(`Tag « ${label} » ajouté.`);
+function saveCache() {
+  localStorage.setItem(STORAGE_KEYS.cache, JSON.stringify(state.cache));
 }
 
-function removeTag(label) {
-  tags = tags.filter((tag) => tag.label !== label);
-  renderTags();
-  statLastTag.textContent = tags.length ? tags[tags.length - 1].label : '—';
+function stringHash(value) {
+  let hash = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = (hash << 5) - hash + value.charCodeAt(i);
+    hash |= 0;
+  }
+  return hash >>> 0;
+}
+
+function formatDuration(seconds) {
+  const mins = Math.floor(seconds / 60)
+    .toString()
+    .padStart(1, '0');
+  const secs = Math.floor(seconds % 60)
+    .toString()
+    .padStart(2, '0');
+  return `${mins}:${secs}`;
+}
+
+function showToast(message) {
+  elements.toast.textContent = message;
+  elements.toast.classList.add('visible');
+  setTimeout(() => {
+    elements.toast.classList.remove('visible');
+  }, 2600);
+}
+
+function updateTranscript(newValue) {
+  state.transcript = newValue;
+  elements.transcript.value = newValue;
+  updateStats();
+  scheduleSuggestions();
+}
+
+function updateStats() {
+  const words = state.transcript.trim().split(/\s+/).filter(Boolean);
+  const sections = state.transcript.split(/\n{2,}/).filter((part) => part.trim().length > 0);
+  const durationSeconds = state.startTime ? (Date.now() - state.startTime) / 1000 : 0;
+  const durationText = formatDuration(durationSeconds);
+
+  elements.statDuration.textContent = durationText;
+  elements.statWords.textContent = `${words.length} mot${words.length > 1 ? 's' : ''}`;
+  elements.statSections.textContent = sections.length.toString();
+  elements.statLastTag.textContent = state.tags.at(-1)?.label ?? '—';
+  elements.meterDuration.textContent = durationText;
+  elements.meterWords.textContent = words.length.toString();
+  elements.meterTags.textContent = state.tags.length.toString();
+}
+
+function scheduleSuggestions() {
+  const now = Date.now();
+  if (now - state.lastSuggestionUpdate < 1200) return;
+  state.lastSuggestionUpdate = now;
+  const text = state.transcript.trim();
+  const suggestions = !text
+    ? []
+    : buildSuggestions(text).slice(0, 3);
+
+  elements.suggestionList.innerHTML = '';
+  suggestions.forEach((suggestion) => {
+    const item = document.createElement('li');
+    item.textContent = suggestion;
+    elements.suggestionList.append(item);
+  });
+}
+
+function buildSuggestions(text) {
+  const sentences = text.split(/(?<=[.!?])\s+/).filter((sentence) => sentence.length > 30);
+  const keywords = Array.from(new Set(text.match(/\b[A-ZÀ-Ü][a-zà-ü]+/g) || [])).slice(0, 4);
+  const suggestions = [];
+  if (sentences.length > 0) {
+    suggestions.push('Créer un résumé des points clés du cours.');
+  }
+  if (keywords.length > 1) {
+    suggestions.push(`Demander un quiz sur : ${keywords.join(', ')}.`);
+  }
+  if (text.length > 600) {
+    suggestions.push('Générer des flashcards ou un jeu de révision.');
+  }
+  if (!suggestions.length) {
+    suggestions.push('Ajoutez vos notes ou importez une transcription.');
+  }
+  return suggestions;
 }
 
 function renderTags() {
-  tagList.innerHTML = '';
-  tags.slice(-12).forEach((tag) => {
-    const chip = document.createElement('span');
-    chip.className = 'chip';
-    chip.innerHTML = `${tag.label}<button aria-label="Retirer le tag ${tag.label}">×</button>`;
-    chip.querySelector('button').addEventListener('click', () => removeTag(tag.label));
-    tagList.appendChild(chip);
+  elements.tagList.innerHTML = '';
+  state.tags.forEach((tag) => {
+    const item = document.createElement('li');
+    item.innerHTML = `<span>${tag.label}</span>`;
+    const removeButton = document.createElement('button');
+    removeButton.type = 'button';
+    removeButton.setAttribute('aria-label', `Supprimer ${tag.label}`);
+    removeButton.textContent = '×';
+    removeButton.addEventListener('click', () => removeTag(tag.id));
+    item.append(removeButton);
+    elements.tagList.append(item);
+  });
+  updateStats();
+}
+
+function addTag() {
+  const selectionStart = elements.transcript.selectionStart;
+  const selectionEnd = elements.transcript.selectionEnd;
+  let snippet = '';
+  if (selectionEnd > selectionStart) {
+    snippet = elements.transcript.value.slice(selectionStart, selectionEnd).trim();
+  }
+  const label = prompt(snippet ? 'Tag pour la sélection :' : 'Créer un tag (ex : Concept clé)');
+  if (!label) return;
+  const tag = {
+    id:
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `tag-${Date.now()}-${Math.floor(Math.random() * 10_000)}`,
+    label,
+    snippet,
+    createdAt: new Date().toISOString()
+  };
+  state.tags.push(tag);
+  renderTags();
+  showToast('Tag ajouté');
+}
+
+function removeTag(tagId) {
+  state.tags = state.tags.filter((tag) => tag.id !== tagId);
+  renderTags();
+}
+
+function clearTranscript() {
+  if (!state.transcript) return;
+  if (!confirm('Supprimer la transcription actuelle ?')) return;
+  updateTranscript('');
+  state.tags = [];
+  renderTags();
+  showToast('Transcription nettoyée');
+}
+
+function setupTheme() {
+  const applyTheme = (mode) => {
+    const root = document.documentElement;
+    if (mode === 'light') {
+      root.classList.add('dark');
+      elements.themeToggle.textContent = 'Mode nuit';
+    } else {
+      root.classList.remove('dark');
+      elements.themeToggle.textContent = 'Mode clair';
+    }
+    localStorage.setItem(STORAGE_KEYS.theme, mode);
+  };
+
+  const saved = localStorage.getItem(STORAGE_KEYS.theme) || 'dark';
+  applyTheme(saved);
+
+  elements.themeToggle.addEventListener('click', () => {
+    const current = document.documentElement.classList.contains('dark') ? 'light' : 'dark';
+    const next = current === 'light' ? 'dark' : 'light';
+    applyTheme(next);
   });
 }
 
-function randomSuggestionSet() {
-  const set = SUGGESTION_SETS[Math.floor(Math.random() * SUGGESTION_SETS.length)];
-  suggestionsList.innerHTML = '';
-  set.forEach((text) => {
-    const li = document.createElement('li');
-    li.textContent = text;
-    suggestionsList.appendChild(li);
-  });
+function startTimer() {
+  state.startTime = Date.now();
+  if (state.timerInterval) clearInterval(state.timerInterval);
+  state.timerInterval = setInterval(() => {
+    const elapsedSeconds = (Date.now() - state.startTime) / 1000;
+    const formatted = formatDuration(elapsedSeconds);
+    elements.statDuration.textContent = formatted;
+    elements.meterDuration.textContent = formatted;
+  }, 1000);
 }
 
-function ensureRecognition() {
+function stopTimer() {
+  clearInterval(state.timerInterval);
+  state.timerInterval = null;
+}
+
+function drawWaveform() {
+  const canvas = elements.waveform;
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  const { width, height } = canvas;
+  ctx.clearRect(0, 0, width, height);
+
+  const barCount = 42;
+  const gradient = ctx.createLinearGradient(0, 0, width, height);
+  gradient.addColorStop(0, 'rgba(106, 123, 255, 0.85)');
+  gradient.addColorStop(1, 'rgba(60, 211, 138, 0.75)');
+
+  for (let i = 0; i < barCount; i += 1) {
+    const barWidth = width / barCount;
+    const x = i * barWidth;
+    const noise = Math.random() * (state.isRecording ? 1 : 0.4);
+    const barHeight = (Math.sin((Date.now() / 120) + i) * 0.5 + 0.5 + noise) * (height / 1.8);
+    ctx.fillStyle = gradient;
+    ctx.fillRect(x, (height - barHeight) / 2, barWidth * 0.75, barHeight);
+  }
+
+  state.waveAnimation = requestAnimationFrame(drawWaveform);
+}
+
+function stopWaveform() {
+  if (state.waveAnimation) cancelAnimationFrame(state.waveAnimation);
+  state.waveAnimation = null;
+  if (!elements.waveform) return;
+  const ctx = elements.waveform.getContext('2d');
+  if (ctx) {
+    ctx.clearRect(0, 0, elements.waveform.width, elements.waveform.height);
+  }
+}
+
+function updateSessionStatus(text, variant = 'idle') {
+  elements.sessionStatus.textContent = text;
+  elements.sessionStatus.className = `status-dot status-${variant}`;
+}
+
+function ensureSpeechRecognition() {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognition) {
-    showToast("La reconnaissance vocale n'est pas disponible dans ce navigateur.");
+    showToast('La reconnaissance vocale est indisponible sur ce navigateur.');
     return null;
   }
-  if (!recognition) {
-    recognition = new SpeechRecognition();
-    recognition.lang = 'fr-FR';
-    recognition.interimResults = true;
-    recognition.continuous = true;
+  if (state.recognition) return state.recognition;
 
-    recognition.onresult = (event) => {
-      let interimTranscript = '';
-      let finalTranscript = transcriptEl.value;
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const result = event.results[i];
-        const text = result[0].transcript.trim();
-        if (result.isFinal) {
-          finalTranscript += (finalTranscript.endsWith(' ') ? '' : ' ') + cleanTranscript(text);
-        } else {
-          interimTranscript += text + ' ';
-        }
+  const recognition = new SpeechRecognition();
+  recognition.lang = 'fr-FR';
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.maxAlternatives = 1;
+
+  recognition.onstart = () => {
+    state.isRecording = true;
+    elements.recordButton.disabled = true;
+    elements.stopButton.disabled = false;
+    updateSessionStatus('En cours', 'recording');
+    elements.recordingBadge.textContent = 'Enregistrement en cours…';
+    startTimer();
+    stopWaveform();
+    drawWaveform();
+  };
+
+  recognition.onerror = (event) => {
+    console.error('Erreur de reconnaissance vocale', event.error);
+    showToast("L'enregistrement a été interrompu");
+    stopRecording();
+  };
+
+  recognition.onend = () => {
+    state.isRecording = false;
+    elements.recordButton.disabled = false;
+    elements.stopButton.disabled = true;
+    elements.recordingBadge.textContent = '';
+    stopWaveform();
+    drawWaveform();
+    stopTimer();
+    updateSessionStatus('Prêt', 'idle');
+    persistSession('auto');
+  };
+
+  recognition.onresult = (event) => {
+    let finalTranscript = state.transcript;
+    state.interim = '';
+    for (let i = event.resultIndex; i < event.results.length; i += 1) {
+      const result = event.results[i];
+      const text = result[0].transcript.trim();
+      if (result.isFinal && text) {
+        finalTranscript = `${finalTranscript} ${text}`.trim();
+      } else if (!result.isFinal && text) {
+        state.interim = `${state.interim} ${text}`.trim();
       }
-      transcriptEl.value = finalTranscript + (interimTranscript ? `\n[En cours] ${interimTranscript}` : '');
-      updateWordStats();
-    };
+    }
+    updateTranscript(finalTranscript);
+    elements.recordingBadge.textContent = state.interim
+      ? `Interprétation provisoire : ${state.interim}`
+      : 'Enregistrement en cours…';
+  };
 
-    recognition.onerror = (event) => {
-      console.error('Speech recognition error:', event.error);
-      showToast('Erreur de reconnaissance : ' + event.error);
-      stopRecording();
-    };
-
-    recognition.onend = () => {
-      if (isRecording) {
-        recognition.start();
-      }
-    };
-  }
+  state.recognition = recognition;
   return recognition;
 }
 
-function cleanTranscript(text) {
-  return text
-    .replace(/\s+/g, ' ')
-    .replace(/\bpoint\b/gi, '.')
-    .replace(/\bvirgule\b/gi, ',')
-    .replace(/\bpoint d'interrogation\b/gi, '?')
-    .replace(/\bpoint d'exclamation\b/gi, '!')
-    .trim();
-}
-
-function startRecording() {
-  const recognition = ensureRecognition();
-  if (!recognition) return;
-  try {
-    recognition.start();
-    isRecording = true;
-    startTimestamp = Date.now();
-    startBtn.disabled = true;
-    stopBtn.disabled = false;
-    statusEl.textContent = 'Enregistrement en cours…';
-    heroChapter.textContent = `Séance ${new Date().toLocaleDateString('fr-FR')}`;
-    recordingInterval = setInterval(updateHeroStats, 1000);
-    randomSuggestionSet();
-    showToast('Enregistrement démarré.');
-  } catch (error) {
-    console.error(error);
-    showToast("Impossible de démarrer l'enregistrement.");
+async function startRecording() {
+  const recognition = ensureSpeechRecognition();
+  if (!recognition || state.isRecording) return;
+  if (state.transcript.trim()) {
+    const continueSession = confirm('Continuer l\'enregistrement sur la session actuelle ?');
+    if (!continueSession) {
+      await persistSession('manual');
+      state.sessionId = null;
+      state.backendId = null;
+      state.tags = [];
+      renderTags();
+      updateTranscript('');
+    }
   }
+  recognition.start();
+  updateSessionStatus('Initialisation…', 'active');
 }
 
 function stopRecording() {
-  if (!recognition || !isRecording) return;
-  recognition.stop();
-  isRecording = false;
-  startBtn.disabled = false;
-  stopBtn.disabled = true;
-  statusEl.textContent = 'Enregistrement arrêté.';
-  clearInterval(recordingInterval);
-  updateHeroStats();
-  transcriptEl.value = transcriptEl.value.replace(/\n\[En cours].*/, '').trim();
-  updateWordStats();
-  showToast('Transcription enregistrée localement.');
-}
-
-function generateCacheKey(endpoint, body) {
-  return `${endpoint}:${JSON.stringify(body)}`;
-}
-
-async function callBackend(endpoint, payload) {
-  const body = { ...payload, useCache: cacheToggle.checked };
-  const cacheKey = generateCacheKey(endpoint, body);
-  if (cacheToggle.checked && cachedResponses.has(cacheKey)) {
-    return cachedResponses.get(cacheKey);
+  if (!state.recognition || !state.isRecording) {
+    persistSession('manual');
+    return;
   }
+  state.recognition.stop();
+}
 
+function exportNotes() {
+  if (!state.transcript) {
+    showToast('Aucune note à exporter.');
+    return;
+  }
+  const blob = new Blob(
+    [
+      `# Notes Omega\n\n` +
+        `Date : ${new Date().toLocaleString()}\n` +
+        `Tags : ${state.tags.map((tag) => tag.label).join(', ') || 'aucun'}\n\n` +
+        state.transcript
+    ],
+    { type: 'text/plain;charset=utf-8' }
+  );
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `omega-notes-${Date.now()}.txt`;
+  link.click();
+  URL.revokeObjectURL(link.href);
+  showToast('Export généré');
+}
+
+async function pingBackend() {
+  if (window.location.protocol.startsWith('file')) {
+    updateSessionStatus('Mode hors ligne', 'idle');
+    return;
+  }
+  try {
+    const response = await fetch('/health', { cache: 'no-store' });
+    state.backendAvailable = response.ok;
+    updateSessionStatus(response.ok ? 'Serveur actif' : 'Mode hors ligne', response.ok ? 'active' : 'idle');
+  } catch (error) {
+    state.backendAvailable = false;
+    updateSessionStatus('Mode hors ligne', 'idle');
+  }
+}
+
+function persistLocalSession() {
+  const transcript = state.transcript.trim();
+  if (!transcript) return null;
+  const existing = state.sessions.find((session) => session.id === state.sessionId);
+  const fallbackId = () =>
+    typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `session-${Date.now()}-${Math.floor(Math.random() * 10_000)}`;
+  const payload = {
+    id: state.sessionId ?? fallbackId(),
+    title: inferTitle(transcript),
+    transcript,
+    tags: state.tags,
+    updatedAt: new Date().toISOString(),
+    wordCount: transcript.split(/\s+/).filter(Boolean).length,
+    backendId: existing?.backendId ?? state.backendId ?? null
+  };
+  if (existing) {
+    Object.assign(existing, payload);
+  } else {
+    state.sessions.unshift(payload);
+  }
+  state.sessionId = payload.id;
+  state.backendId = payload.backendId ?? null;
+  saveSessions();
+  renderSessions();
+  return payload;
+}
+
+async function syncWithBackend(session) {
+  if (!state.backendAvailable || !session) return null;
+  const hasBackendId = Boolean(state.backendId);
+  const endpoint = hasBackendId ? `/api/sessions/${state.backendId}` : '/api/sessions';
+  const method = hasBackendId ? 'PATCH' : 'POST';
+  const body = hasBackendId
+    ? { transcript: session.transcript, metadata: { tags: session.tags } }
+    : { title: session.title, transcript: session.transcript, metadata: { tags: session.tags } };
   try {
     const response = await fetch(endpoint, {
-      method: 'POST',
+      method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-
+    if (!response.ok) throw new Error('Synchronisation impossible');
     const data = await response.json();
-    if (cacheToggle.checked) {
-      cachedResponses.set(cacheKey, data);
+    state.backendId = data.id;
+    const local = state.sessions.find((item) => item.id === state.sessionId);
+    if (local) {
+      local.backendId = data.id;
+      saveSessions();
     }
+    updateSessionStatus('Synchronisé', 'active');
     return data;
   } catch (error) {
-    console.warn('Backend unavailable, switching to local mock.', error);
-    return fallbackAnalysis(endpoint, payload);
+    console.warn('Impossible de synchroniser la session', error);
+    updateSessionStatus('Mode hors ligne', 'idle');
+    state.backendAvailable = false;
+    return null;
   }
 }
 
-function fallbackAnalysis(endpoint, payload) {
-  const text = payload?.content || '';
-  if (!text.trim()) {
-    return { output: "Ajoutez du contenu avant de lancer l'analyse." };
+async function persistSession(trigger = 'manual') {
+  const saved = persistLocalSession();
+  if (saved) {
+    showToast(trigger === 'auto' ? 'Session enregistrée' : 'Sauvegarde réalisée');
   }
-  switch (endpoint) {
-    case '/api/sessions/summary': {
-      const sentences = text
-        .split(/[.!?]\s+/)
-        .filter(Boolean)
-        .slice(0, 5)
-        .map((sentence, index) => `${index + 1}. ${sentence.trim()}`);
-      return { output: `Résumé local (aperçu) :\n${sentences.join('\n')}` };
-    }
-    case '/api/sessions/quiz': {
-      const words = Array.from(new Set(text.split(/\W+/).filter((w) => w.length > 5)));
-      const questions = words.slice(0, 5).map((word, index) => ({
-        question: `Expliquez le terme « ${word} ».`,
-        answer: `Décrivez le concept de ${word} à partir du cours.`
-      }));
-      return { output: questions };
-    }
-    case '/api/sessions/question':
-      return {
-        output: `Réflexion locale : analysez dans vos notes la réponse à « ${payload.question} ».`
-      };
-    case '/api/sessions/game':
-      return {
-        output: `Défi local : trouvez trois points clés et associez-les à des exemples concrets.`
-      };
-    default:
-      return { output: "Analyse indisponible." };
-  }
+  await syncWithBackend(saved);
 }
 
-function renderSummary(result) {
-  summaryOutput.textContent = result.output || 'Aucun résumé généré.';
-}
-
-function renderQuiz(result) {
-  const template = document.getElementById('quizTemplate');
-  const list = template.content.firstElementChild.cloneNode(true);
-  quizOutput.innerHTML = '';
-  if (Array.isArray(result.output)) {
-    result.output.forEach((item) => {
-      const li = document.createElement('li');
-      li.innerHTML = `<strong>${item.question}</strong><br /><span>${item.answer}</span>`;
-      list.appendChild(li);
-    });
-    quizOutput.appendChild(list);
-  } else {
-    quizOutput.textContent = result.output || 'Aucun quiz généré.';
-  }
-}
-
-function renderQuestion(result) {
-  const template = document.getElementById('questionTemplate');
-  const card = template.content.firstElementChild.cloneNode(true);
-  card.textContent = result.output || 'Posez une question pour obtenir une réponse.';
-  questionOutput.innerHTML = '';
-  questionOutput.appendChild(card);
-}
-
-function renderGame(result) {
-  const template = document.getElementById('gameTemplate');
-  const card = template.content.firstElementChild.cloneNode(true);
-  card.textContent = result.output || 'Appuyez sur « Lancer » pour générer un jeu.';
-  gameOutput.innerHTML = '';
-  gameOutput.appendChild(card);
-}
-
-function exportMarkdown() {
-  const content = transcriptEl.value.trim();
-  if (!content) {
-    showToast('Ajoutez du texte avant de lancer un export.');
+function renderSessions() {
+  elements.sessionList.innerHTML = '';
+  if (!state.sessions.length) {
+    const empty = document.createElement('p');
+    empty.textContent = 'Aucune session enregistrée pour le moment.';
+    empty.className = 'session-info';
+    elements.sessionList.append(empty);
     return;
   }
-  const markdown = `# Notes de cours - ${heroChapter.textContent}\n\n${content}\n\n---\n_Générées avec Omega Study_`;
-  const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8;' });
-  downloadBlob(blob, `omega-study-${Date.now()}.md`);
-}
 
-function exportJSON() {
-  const payload = {
-    chapter: heroChapter.textContent,
-    transcript: transcriptEl.value,
-    tags,
-    stats: {
-      words: parseInt(statWords.textContent, 10) || 0,
-      sections: parseInt(statSections.textContent, 10) || 0,
-      lastTag: statLastTag.textContent
-    },
-    generatedAt: new Date().toISOString()
-  };
-  const blob = new Blob([JSON.stringify(payload, null, 2)], {
-    type: 'application/json;charset=utf-8;'
+  const template = document.getElementById('sessionTemplate');
+  state.sessions.forEach((session) => {
+    const instance = template.content.firstElementChild.cloneNode(true);
+    instance.querySelector('.session-title').textContent = session.title;
+    instance.querySelector('.session-info').textContent = `${session.wordCount} mots · ${new Date(
+      session.updatedAt
+    ).toLocaleString()}${session.backendId ? ' · synchronisé' : ''}`;
+    instance.dataset.sessionId = session.id;
+    elements.sessionList.append(instance);
   });
-  downloadBlob(blob, `omega-study-${Date.now()}.json`);
 }
 
-function downloadBlob(blob, filename) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-  showToast('Export téléchargé.');
+function inferTitle(transcript) {
+  const firstSentence = transcript.split(/(?<=[.!?])\s+/)[0];
+  return firstSentence ? firstSentence.slice(0, 60) + (firstSentence.length > 60 ? '…' : '') : 'Cours sans titre';
 }
 
-function autoSave() {
-  const data = {
-    transcript: transcriptEl.value,
-    tags,
-    chapter: heroChapter.textContent
-  };
-  localStorage.setItem('omega-study-session', JSON.stringify(data));
-}
+function handleSessionList(event) {
+  const action = event.target.closest('button')?.dataset.action;
+  if (!action) return;
+  const card = event.target.closest('.session-card');
+  if (!card) return;
+  const { sessionId } = card.dataset;
+  const session = state.sessions.find((item) => item.id === sessionId);
+  if (!session) return;
 
-function loadAutoSave() {
-  try {
-    const raw = localStorage.getItem('omega-study-session');
-    if (!raw) return;
-    const data = JSON.parse(raw);
-    transcriptEl.value = data.transcript || '';
-    heroChapter.textContent = data.chapter || heroChapter.textContent;
-    tags = data.tags || [];
+  if (action === 'load') {
+    state.sessionId = sessionId;
+    state.backendId = session.backendId ?? null;
+    state.tags = session.tags || [];
+    updateTranscript(session.transcript);
     renderTags();
-    updateWordStats();
-  } catch (error) {
-    console.warn('Unable to load autosave', error);
+    showToast('Session chargée');
+  } else if (action === 'delete') {
+    if (!confirm('Supprimer cette session ?')) return;
+    state.sessions = state.sessions.filter((item) => item.id !== sessionId);
+    if (state.sessionId === sessionId) {
+      state.sessionId = null;
+      state.backendId = null;
+      updateTranscript('');
+      state.tags = [];
+      renderTags();
+    }
+    saveSessions();
+    renderSessions();
+    showToast('Session supprimée');
   }
 }
 
-transcriptEl.addEventListener('input', () => {
-  updateWordStats();
-  autoSave();
-});
+function getCacheKey(tool, parameters) {
+  const transcriptHash = stringHash(state.transcript);
+  return `${tool}-${transcriptHash}-${JSON.stringify(parameters)}`;
+}
 
-startBtn.addEventListener('click', startRecording);
-stopBtn.addEventListener('click', stopRecording);
+function readCache(tool, parameters) {
+  const key = getCacheKey(tool, parameters);
+  return state.cache[key] ?? null;
+}
 
-highlightBtn.addEventListener('click', () => {
-  const label = prompt('Nom du tag (ex: Examen, Exemple, Définition) ?');
-  if (label) {
-    addTag(label.trim());
-    autoSave();
-  }
-});
+function writeCache(tool, parameters, value) {
+  const key = getCacheKey(tool, parameters);
+  state.cache[key] = { value, time: Date.now() };
+  saveCache();
+}
 
-clearBtn.addEventListener('click', () => {
-  if (!confirm('Effacer toutes les notes ?')) return;
-  transcriptEl.value = '';
-  tags = [];
-  renderTags();
-  updateWordStats();
-  autoSave();
-  showToast('Notes effacées.');
-});
-
-summaryBtn.addEventListener('click', async () => {
-  const content = transcriptEl.value;
-  summaryOutput.textContent = 'Analyse en cours…';
-  const result = await callBackend('/api/sessions/summary', {
-    content,
-    tone: summaryTone.value
-  });
-  renderSummary(result);
-});
-
-quizBtn.addEventListener('click', async () => {
-  const content = transcriptEl.value;
-  quizOutput.textContent = 'Génération du quiz…';
-  const result = await callBackend('/api/sessions/quiz', {
-    content,
-    difficulty: quizLevel.value
-  });
-  renderQuiz(result);
-});
-
-questionBtn.addEventListener('click', async () => {
-  const content = transcriptEl.value;
-  const question = questionInput.value.trim();
-  if (!question) {
-    showToast('Posez une question avant de lancer le coach.');
+async function generateSummary() {
+  if (!state.transcript.trim()) {
+    showToast('Ajoutez une transcription avant de générer un résumé.');
     return;
   }
-  questionOutput.textContent = 'Réflexion en cours…';
-  const result = await callBackend('/api/sessions/question', {
-    content,
-    question
-  });
-  renderQuestion(result);
-});
-
-gameBtn.addEventListener('click', async () => {
-  const content = transcriptEl.value;
-  gameOutput.textContent = 'Création du challenge…';
-  const result = await callBackend('/api/sessions/game', {
-    content
-  });
-  renderGame(result);
-});
-
-exportBtn.addEventListener('click', exportMarkdown);
-downloadMarkdownBtn.addEventListener('click', exportMarkdown);
-downloadJSONBtn.addEventListener('click', exportJSON);
-
-setInterval(() => {
-  if (isRecording) {
-    autoSave();
+  const tone = elements.summaryTone.value;
+  const cached = readCache('summary', { tone });
+  if (cached) {
+    elements.summaryOutput.textContent = cached.value;
+    showToast('Résumé chargé depuis le cache');
+    return;
   }
-}, 15000);
+  elements.summaryOutput.textContent = 'Génération du résumé…';
+  const response = state.backendAvailable ? await requestBackend('summary', { tone }) : null;
+  const summary = response?.summary ?? fallbackSummary(state.transcript, tone);
+  elements.summaryOutput.textContent = summary;
+  writeCache('summary', { tone }, summary);
+}
 
-randomSuggestionSet();
-loadAutoSave();
-updateWordStats();
+async function generateQuiz() {
+  if (!state.transcript.trim()) {
+    showToast('Ajoutez une transcription avant de générer un quiz.');
+    return;
+  }
+  const count = Math.max(3, Math.min(12, Number(elements.quizCount.value) || 5));
+  elements.quizCount.value = count;
+  const cached = readCache('quiz', { count });
+  if (cached) {
+    elements.quizOutput.textContent = formatQuiz(cached.value);
+    showToast('Quiz issu du cache');
+    return;
+  }
+  elements.quizOutput.textContent = 'Création du quiz…';
+  const response = state.backendAvailable ? await requestBackend('quiz', { count }) : null;
+  const quiz = response?.quiz ?? fallbackQuiz(state.transcript, count);
+  elements.quizOutput.textContent = formatQuiz(quiz);
+  writeCache('quiz', { count }, quiz);
+}
+
+async function askQuestion() {
+  const question = elements.questionInput.value.trim();
+  if (!question) {
+    showToast('Formulez votre question.');
+    return;
+  }
+  if (!state.transcript.trim()) {
+    showToast('Ajoutez une transcription pour contextualiser la réponse.');
+    return;
+  }
+  const cached = readCache('question', { question });
+  if (cached) {
+    elements.questionOutput.textContent = cached.value;
+    showToast('Réponse issue du cache');
+    return;
+  }
+  elements.questionOutput.textContent = 'Analyse en cours…';
+  const response = state.backendAvailable ? await requestBackend('questions', { question }) : null;
+  const answer = response?.answer ?? fallbackQuestion(state.transcript, question);
+  elements.questionOutput.textContent = answer;
+  writeCache('question', { question }, answer);
+}
+
+async function generateGames() {
+  if (!state.transcript.trim()) {
+    showToast('Ajoutez une transcription avant de générer des jeux.');
+    return;
+  }
+  const cached = readCache('games', {});
+  if (cached) {
+    elements.gamesOutput.textContent = formatGames(cached.value);
+    showToast('Jeux chargés depuis le cache');
+    return;
+  }
+  elements.gamesOutput.textContent = 'Création des jeux…';
+  const response = state.backendAvailable ? await requestBackend('games', {}) : null;
+  const games = response ?? fallbackGames(state.transcript);
+  elements.gamesOutput.textContent = formatGames(games);
+  writeCache('games', {}, games);
+}
+
+async function requestBackend(tool, payload) {
+  if (!state.backendAvailable) return null;
+  try {
+    const session = await persistLocalSession();
+    await syncWithBackend(session);
+    if (!state.backendId) {
+      throw new Error('Session non synchronisée');
+    }
+    const response = await fetch(`/api/sessions/${state.backendId}/${tool}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) throw new Error('Erreur du serveur');
+    return await response.json();
+  } catch (error) {
+    console.warn('Requête backend impossible', error);
+    showToast('Serveur IA indisponible, utilisation du mode local.');
+    state.backendAvailable = false;
+    updateSessionStatus('Mode hors ligne', 'idle');
+    return null;
+  }
+}
+
+function fallbackSummary(text, tone) {
+  const sentences = text.split(/(?<=[.!?])\s+/).filter((sentence) => sentence.length > 0);
+  const highlights = sentences.slice(0, 6);
+  if (tone === 'fiche') {
+    return highlights
+      .map((sentence) => `• ${sentence}`)
+      .join('\n');
+  }
+  if (tone === 'narratif') {
+    return `En résumé, ${highlights.join(' ')}\n\nConclusion : ${sentences.at(-1) ?? ''}`.trim();
+  }
+  return highlights.slice(0, 3).join(' ');
+}
+
+function fallbackQuiz(text, count) {
+  const sentences = text.split(/(?<=[.!?])\s+/).filter((sentence) => sentence.length > 30);
+  if (!sentences.length) return [];
+  const questions = [];
+  for (let i = 0; i < count; i += 1) {
+    const sentence = sentences[i % sentences.length];
+    const cleanSentence = sentence.replace(/\s+/g, ' ').trim();
+    questions.push({
+      question: `Expliquez : ${cleanSentence.slice(0, 90)}${cleanSentence.length > 90 ? '…' : ''}`,
+      answer: cleanSentence
+    });
+  }
+  return questions;
+}
+
+function fallbackQuestion(text, question) {
+  const lowerQuestion = question.toLowerCase();
+  const sentences = text.split(/(?<=[.!?])\s+/);
+  const relevant = sentences.filter((sentence) => sentence.toLowerCase().includes(lowerQuestion.split(' ')[0] ?? ''));
+  if (relevant.length) {
+    return relevant.join(' ');
+  }
+  return "Aucune réponse directe trouvée. Relisez la section concernée ou générez un résumé.";
+}
+
+function fallbackGames(text) {
+  const sentences = text.split(/(?<=[.!?])\s+/).filter(Boolean);
+  return {
+    flashcards: sentences.slice(0, 4).map((sentence, index) => ({
+      front: `Concept ${index + 1}`,
+      back: sentence.trim()
+    })),
+    brainstorm: sentences.slice(-3).map((sentence) => `Idée : ${sentence.trim()}`)
+  };
+}
+
+function formatQuiz(quiz) {
+  return quiz.map((item, index) => `${index + 1}. ${item.question}\n   → ${item.answer}`).join('\n\n');
+}
+
+function formatGames(games) {
+  if (Array.isArray(games)) {
+    return games
+      .map((game) => `• ${game.title ?? game}`)
+      .join('\n');
+  }
+  const parts = [];
+  if (games.flashcards) {
+    parts.push('Flashcards :');
+    games.flashcards.forEach((card, index) => {
+      parts.push(`${index + 1}. ${card.front}\n   Réponse : ${card.back}`);
+    });
+  }
+  if (games.brainstorm) {
+    parts.push('\nIdées de jeux :');
+    games.brainstorm.forEach((idea) => parts.push(`• ${idea}`));
+  }
+  return parts.join('\n');
+}
+
+function setupEventListeners() {
+  elements.recordButton.addEventListener('click', startRecording);
+  elements.stopButton.addEventListener('click', stopRecording);
+  elements.exportButton.addEventListener('click', exportNotes);
+  elements.tagButton.addEventListener('click', addTag);
+  elements.clearButton.addEventListener('click', clearTranscript);
+  elements.transcript.addEventListener('input', (event) => updateTranscript(event.target.value));
+  elements.summaryButton.addEventListener('click', generateSummary);
+  elements.quizButton.addEventListener('click', generateQuiz);
+  elements.questionButton.addEventListener('click', askQuestion);
+  elements.gamesButton.addEventListener('click', generateGames);
+  elements.sessionList.addEventListener('click', handleSessionList);
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && state.isRecording) {
+      stopRecording();
+    }
+  });
+}
+
+function initialize() {
+  setupTheme();
+  setupEventListeners();
+  renderTags();
+  renderSessions();
+  const firstSession = state.sessions[0];
+  if (firstSession) {
+    state.sessionId = firstSession.id;
+    state.backendId = firstSession.backendId ?? null;
+    state.tags = firstSession.tags || [];
+    renderTags();
+    updateTranscript(firstSession.transcript);
+  } else {
+    updateTranscript('');
+  }
+  elements.year.textContent = new Date().getFullYear().toString();
+  pingBackend();
+  drawWaveform();
+}
+
+initialize();
