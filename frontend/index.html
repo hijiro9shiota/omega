@@ -1,3 +1,234 @@
+
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Omega Académie · Assistant de prise de notes IA</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <div class="bg-gradient" aria-hidden="true">
+        <span class="orb orb-one"></span>
+        <span class="orb orb-two"></span>
+        <span class="orb orb-three"></span>
+      </div>
+
+      <header class="topbar">
+        <div class="brand">
+          <span class="logo">Ω</span>
+          <div class="brand-text">
+            <h1>Omega Académie</h1>
+            <p>Votre copilote académique, léger et précis.</p>
+          </div>
+        </div>
+        <nav class="topnav">
+          <a href="#capture">Capturer</a>
+          <a href="#ia-tools">IA</a>
+          <a href="#sessions">Sessions</a>
+        </nav>
+        <button id="themeToggle" class="ghost-btn" type="button">Mode clair</button>
+      </header>
+
+      <main class="main">
+        <section class="hero" id="capture">
+          <div class="hero-text">
+            <p class="hero-overline">Nouvelle génération</p>
+            <h2>
+              Enregistrez vos cours, synthétisez-les et révisez avec un seul outil
+              optimisé.
+            </h2>
+            <p class="hero-subtitle">
+              Capture vocale sans stockage audio, transcription temps réel, tags
+              contextuels et analyses IA activées uniquement quand vous en avez
+              réellement besoin.
+            </p>
+            <div class="hero-actions">
+              <button id="recordButton" class="primary-btn" type="button">
+                <span class="pulse-dot"></span>
+                Lancer l'enregistrement
+              </button>
+              <button id="stopButton" class="secondary-btn" type="button" disabled>
+                Arrêter
+              </button>
+              <button id="exportButton" class="ghost-btn" type="button">
+                Exporter les notes
+              </button>
+            </div>
+            <div id="recordingBadge" class="recording-badge" role="status"></div>
+          </div>
+          <div class="hero-visual" aria-hidden="true">
+            <div class="meter-card">
+              <div class="meter-header">
+                <h3>Session en direct</h3>
+                <span id="sessionStatus" class="status-dot status-idle">Prêt</span>
+              </div>
+              <dl class="meter-grid">
+                <div>
+                  <dt>Durée</dt>
+                  <dd id="meterDuration">0:00</dd>
+                </div>
+                <div>
+                  <dt>Mots</dt>
+                  <dd id="meterWords">0</dd>
+                </div>
+                <div>
+                  <dt>Tags</dt>
+                  <dd id="meterTags">0</dd>
+                </div>
+              </dl>
+              <canvas id="waveform" width="220" height="80"></canvas>
+            </div>
+          </div>
+        </section>
+
+        <section class="grid" aria-label="Prise de notes enrichie">
+          <article class="card transcript-card">
+            <header class="card-header">
+              <div>
+                <h3>Transcription intelligente</h3>
+                <p>Nettoyez et éditez vos notes à mesure qu'elles arrivent.</p>
+              </div>
+              <div class="card-actions">
+                <button id="tagButton" class="ghost-btn" type="button">Ajouter un tag</button>
+                <button id="clearButton" class="ghost-btn" type="button">Effacer</button>
+              </div>
+            </header>
+            <textarea
+              id="transcript"
+              placeholder="Cliquez sur « Lancer l'enregistrement » ou saisissez manuellement vos notes."
+            ></textarea>
+            <ul id="tagList" class="tag-list" aria-live="polite"></ul>
+          </article>
+
+          <aside class="card insights-card">
+            <header class="card-header">
+              <div>
+                <h3>Statistiques instantanées</h3>
+                <p>Comprenez votre cours en un clin d'œil.</p>
+              </div>
+            </header>
+            <div class="stats-grid">
+              <div class="stat">
+                <span class="stat-label">Temps</span>
+                <span id="statDuration" class="stat-value">0:00</span>
+              </div>
+              <div class="stat">
+                <span class="stat-label">Volume</span>
+                <span id="statWords" class="stat-value">0 mots</span>
+              </div>
+              <div class="stat">
+                <span class="stat-label">Sections</span>
+                <span id="statSections" class="stat-value">0</span>
+              </div>
+              <div class="stat">
+                <span class="stat-label">Dernier tag</span>
+                <span id="statLastTag" class="stat-value">—</span>
+              </div>
+            </div>
+            <div class="suggestions">
+              <h4>Suggestions IA</h4>
+              <ul id="suggestionList"></ul>
+            </div>
+          </aside>
+        </section>
+
+        <section id="ia-tools" class="tools" aria-label="Outils IA">
+          <header class="section-header">
+            <h3>Analyse IA à la demande</h3>
+            <p>Seuls les appels nécessaires sont réalisés, avec mise en cache locale.</p>
+          </header>
+          <div class="tools-grid">
+            <article class="tool-card" data-tool="summary">
+              <h4>Résumé express</h4>
+              <p>Synthèse en quelques secondes avec trois tonalités.</p>
+              <div class="tool-controls">
+                <label for="summaryTone">Tonalité</label>
+                <select id="summaryTone">
+                  <option value="essentiel">Essentiel</option>
+                  <option value="fiche">Fiche de révision</option>
+                  <option value="narratif">Narratif</option>
+                </select>
+                <button id="summaryButton" class="primary-btn small" type="button">Générer</button>
+              </div>
+              <div id="summaryOutput" class="tool-output" aria-live="polite"></div>
+            </article>
+
+            <article class="tool-card" data-tool="quiz">
+              <h4>Quiz adaptatif</h4>
+              <p>Évaluez-vous selon le niveau souhaité.</p>
+              <div class="tool-controls">
+                <label for="quizCount">Nombre de questions</label>
+                <input id="quizCount" type="number" min="3" max="12" value="5" />
+                <button id="quizButton" class="primary-btn small" type="button">Créer</button>
+              </div>
+              <div id="quizOutput" class="tool-output" aria-live="polite"></div>
+            </article>
+
+            <article class="tool-card" data-tool="qa">
+              <h4>Coach Q/R</h4>
+              <p>Posez une question, obtenez une réponse ciblée.</p>
+              <div class="tool-controls">
+                <label class="sr-only" for="questionInput">Question</label>
+                <input
+                  id="questionInput"
+                  type="text"
+                  placeholder="Ex. Quelle est la définition du concept clé ?"
+                />
+                <button id="questionButton" class="primary-btn small" type="button">Demander</button>
+              </div>
+              <div id="questionOutput" class="tool-output" aria-live="polite"></div>
+            </article>
+
+            <article class="tool-card" data-tool="games">
+              <h4>Jeux pédagogiques</h4>
+              <p>Transformez votre cours en défis ludiques.</p>
+              <div class="tool-controls">
+                <button id="gamesButton" class="primary-btn small" type="button">Générer</button>
+              </div>
+              <div id="gamesOutput" class="tool-output" aria-live="polite"></div>
+            </article>
+          </div>
+        </section>
+
+        <section id="sessions" class="sessions" aria-label="Historique des sessions">
+          <header class="section-header">
+            <h3>Vos sessions enregistrées</h3>
+            <p>Retrouvez vos notes enregistrées localement ou côté serveur.</p>
+          </header>
+          <div id="sessionList" class="session-list" aria-live="polite"></div>
+        </section>
+      </main>
+
+      <footer class="footer">
+        <p>Optimisé pour limiter l'utilisation des crédits IA. Fonctionne hors ligne avec des modèles embarqués.</p>
+        <p class="footer-small">© <span id="year"></span> Omega Académie. Tous droits réservés.</p>
+      </footer>
+    </div>
+
+    <div id="toast" class="toast" role="status" aria-live="assertive"></div>
+
+    <template id="sessionTemplate">
+      <article class="session-card">
+        <div class="session-meta">
+          <h4 class="session-title"></h4>
+          <p class="session-info"></p>
+        </div>
+        <div class="session-actions">
+          <button class="secondary-btn small" data-action="load">Charger</button>
+          <button class="ghost-btn small" data-action="delete">Supprimer</button>
+        </div>
+      </article>
+    </template>
+
+    <script type="module" src="app.js"></script>
 <!doctype html>
 <html lang="fr">
   <head>
