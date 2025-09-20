@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Omega Study • Assistant académique IA</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <aside class="sidebar" aria-label="Navigation principale">
+        <div class="brand">
+          <div class="logo">Ω</div>
+          <div>
+            <h1>Omega Study</h1>
+            <p>L'assistant académique augmenté par l'IA</p>
+          </div>
+        </div>
+        <nav class="sidebar-nav">
+          <a class="active" href="#panel-capture">Prise de notes</a>
+          <a href="#panel-analytics">Analyses IA</a>
+          <a href="#panel-ressources">Ressources</a>
+        </nav>
+        <div class="sidebar-footer">
+          <p class="tip">Optimisé pour limiter la consommation de crédits IA.</p>
+          <button id="exportButton" class="ghost-btn">Exporter les notes</button>
+        </div>
+      </aside>
+
+      <main class="content">
+        <header class="hero">
+          <div>
+            <span class="hero-tag">Nouveau</span>
+            <h2>Enregistrez, structurez et exploitez vos cours en un éclair.</h2>
+            <p>
+              Capturez le discours du professeur, nettoyez-le en direct, puis lancez
+              uniquement les analyses dont vous avez besoin : résumés ultra-rapides,
+              quiz adaptatifs, flashcards et jeux pédagogiques.
+            </p>
+            <div class="hero-actions">
+              <button id="startRecording" class="primary-btn">Commencer l'enregistrement</button>
+              <button id="stopRecording" class="secondary-btn" disabled>Arrêter</button>
+            </div>
+            <div id="recordingStatus" class="recording-status" role="status"></div>
+          </div>
+          <div class="hero-visual" aria-hidden="true">
+            <div class="pulse"></div>
+            <div class="visual-card">
+              <h3>Session en cours</h3>
+              <ul>
+                <li><span>Chapitre</span><strong id="heroChapter">Aucun</strong></li>
+                <li><span>Durée</span><strong id="heroDuration">0:00</strong></li>
+                <li><span>Mots capturés</span><strong id="heroWordCount">0</strong></li>
+              </ul>
+            </div>
+          </div>
+        </header>
+
+        <section id="panel-capture" class="panel">
+          <header class="panel-header">
+            <div>
+              <h3>Notes intelligentes</h3>
+              <p>Relecture instantanée, nettoyage automatique et tags contextuels.</p>
+            </div>
+            <div class="panel-actions">
+              <button id="highlightButton" class="ghost-btn">Ajouter un tag</button>
+              <button id="clearButton" class="ghost-btn">Effacer</button>
+            </div>
+          </header>
+          <div class="panel-body">
+            <div class="transcript-area">
+              <textarea
+                id="transcript"
+                placeholder="Appuyez sur « Commencer l'enregistrement » pour générer la transcription ou saisissez vos notes manuellement."
+              ></textarea>
+              <div class="chips" id="tagList" aria-live="polite"></div>
+            </div>
+            <aside class="session-info">
+              <article class="info-card">
+                <h4>Statistiques</h4>
+                <div class="stats-grid">
+                  <div class="stat">
+                    <span>Sections</span>
+                    <strong id="statSections">0</strong>
+                  </div>
+                  <div class="stat">
+                    <span>Mots</span>
+                    <strong id="statWords">0</strong>
+                  </div>
+                  <div class="stat">
+                    <span>Dernier tag</span>
+                    <strong id="statLastTag">—</strong>
+                  </div>
+                </div>
+              </article>
+              <article class="info-card">
+                <h4>Suggestions IA</h4>
+                <ul id="suggestions" class="suggestions"></ul>
+              </article>
+            </aside>
+          </div>
+        </section>
+
+        <section id="panel-analytics" class="panel">
+          <header class="panel-header">
+            <div>
+              <h3>Analyse IA à la demande</h3>
+              <p>Résumés, quiz et brainstorming selon vos besoins.</p>
+            </div>
+            <div class="panel-actions">
+              <label class="toggle">
+                <input type="checkbox" id="cacheToggle" checked />
+                <span>Activer la mise en cache des réponses</span>
+              </label>
+            </div>
+          </header>
+          <div class="panel-body responsive-grid">
+            <article class="tool-card">
+              <header>
+                <h4>Résumé intelligent</h4>
+                <p>3 niveaux de profondeur pour réviser efficacement.</p>
+              </header>
+              <div class="tool-controls">
+                <select id="summaryTone">
+                  <option value="bullet">Plan à puces</option>
+                  <option value="study">Fiche de révision</option>
+                  <option value="story">Explication narrative</option>
+                </select>
+                <button id="summaryButton" class="primary-btn small">Générer</button>
+              </div>
+              <div id="summaryOutput" class="tool-output" aria-live="polite"></div>
+            </article>
+
+            <article class="tool-card">
+              <header>
+                <h4>Quiz adaptatif</h4>
+                <p>Auto-évaluez-vous avec des questions ciblées.</p>
+              </header>
+              <div class="tool-controls">
+                <select id="quizLevel">
+                  <option value="easy">Niveau facile</option>
+                  <option value="medium">Niveau moyen</option>
+                  <option value="hard">Niveau avancé</option>
+                </select>
+                <button id="quizButton" class="primary-btn small">Créer</button>
+              </div>
+              <div id="quizOutput" class="tool-output" aria-live="polite"></div>
+            </article>
+
+            <article class="tool-card">
+              <header>
+                <h4>Coach Q/R</h4>
+                <p>Prenez l'habitude de questionner le contenu.</p>
+              </header>
+              <div class="tool-controls">
+                <input id="questionInput" type="text" placeholder="Posez une question" />
+                <button id="questionButton" class="primary-btn small">Répondre</button>
+              </div>
+              <div id="questionOutput" class="tool-output" aria-live="polite"></div>
+            </article>
+
+            <article class="tool-card">
+              <header>
+                <h4>Jeu pédagogique</h4>
+                <p>Transformez le cours en challenge amusant.</p>
+              </header>
+              <div class="tool-controls">
+                <button id="gameButton" class="primary-btn small">Lancer</button>
+              </div>
+              <div id="gameOutput" class="tool-output" aria-live="polite"></div>
+            </article>
+          </div>
+        </section>
+
+        <section id="panel-ressources" class="panel">
+          <header class="panel-header">
+            <div>
+              <h3>Ressources & export</h3>
+              <p>Gérez vos sessions et partagez facilement.</p>
+            </div>
+          </header>
+          <div class="panel-body resources-grid">
+            <article class="resource-card">
+              <h4>Structurez vos cours</h4>
+              <p>
+                Utilisez les tags, la séparation par sections et les stats automatiques
+                pour mieux mémoriser les contenus magistraux.
+              </p>
+              <ul>
+                <li>Sections dynamiques</li>
+                <li>Calcul du temps d'écoute</li>
+                <li>Détection des thèmes récurrents</li>
+              </ul>
+            </article>
+            <article class="resource-card">
+              <h4>Limiter les crédits IA</h4>
+              <p>
+                Les analyses IA ne sont déclenchées que sur demande et les réponses sont
+                mises en cache pour économiser vos crédits.
+              </p>
+              <ul>
+                <li>Prévisualisation gratuite locale</li>
+                <li>Mise en cache automatique</li>
+                <li>Historique exportable</li>
+              </ul>
+            </article>
+            <article class="resource-card">
+              <h4>Exporter & partager</h4>
+              <p>
+                Téléchargez vos notes formatées en Markdown ou PDF pour les diffuser à
+                vos camarades en un clic.
+              </p>
+              <button id="downloadMarkdown" class="secondary-btn">Exporter en Markdown</button>
+              <button id="downloadJSON" class="ghost-btn">Exporter en JSON</button>
+            </article>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div class="toast" id="toast" role="alert" aria-live="assertive"></div>
+
+    <template id="quizTemplate">
+      <ol class="quiz-list"></ol>
+    </template>
+    <template id="questionTemplate">
+      <article class="answer-card"></article>
+    </template>
+    <template id="gameTemplate">
+      <div class="game-card"></div>
+    </template>
+
+    <script src="app.js"></script>
+  </body>
+</html>
