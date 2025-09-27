@@ -1,0 +1,32 @@
+@font-face {
+  font-family: 'OryonRobot';
+  src: url('/robot-font.woff2') format('woff2');
+  font-display: swap;
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  min-height: 100vh;
+  background: radial-gradient(circle at top, rgba(56, 189, 248, 0.12), transparent 55%),
+    radial-gradient(circle at bottom, rgba(168, 85, 247, 0.08), transparent 60%), #020617;
+  font-feature-settings: 'ss01' on, 'ss03' on;
+}
+
+.glass-panel {
+  @apply bg-slate-900/70 backdrop-blur-xl border border-slate-700/60 shadow-glass;
+}
+
+.neon-border {
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.9), 0 0 25px rgba(56, 189, 248, 0.25);
+}
+
+.tag-chip {
+  @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-slate-800/70 text-slate-200;
+}
