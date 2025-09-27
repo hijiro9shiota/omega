@@ -1,0 +1,35 @@
+defaults:
+  data_dir: data_store
+  cache_dir: cache
+  sqlite_path: data_store/oryon.sqlite
+  duckdb_path: data_store/oryon.duckdb
+  json_snapshot_interval: 1000
+  json_snapshot_retention: 5
+  ingestion_parallelism: 4
+  cache_ttl_minutes: 120
+  request_timeout_seconds: 30
+  rate_limit_window_seconds: 60
+  rate_limit_max_requests: 90
+  symbol_universe_path: data_store/symbols.jsonl
+  connectors:
+    yfinance:
+      enabled: true
+      max_chunk_days: 60
+    stooq:
+      enabled: true
+    ccxt:
+      enabled: true
+      exchange: binance
+    binance_public:
+      enabled: true
+    file_csv:
+      enabled: true
+  timeframes:
+    - 1d
+    - 4h
+    - 1h
+    - 15m
+    - 5m
+  demo_bundle:
+    enabled: true
+    path: demo_data
