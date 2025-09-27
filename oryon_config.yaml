@@ -3,6 +3,10 @@ defaults:
   cache_dir: cache
   sqlite_path: data_store/oryon.sqlite
   duckdb_path: data_store/oryon.duckdb
+
+  api_prefix: /api
+  ui_dist_path: ui/dist
+
   json_snapshot_interval: 1000
   json_snapshot_retention: 5
   ingestion_parallelism: 4
