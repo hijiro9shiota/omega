@@ -36,7 +36,10 @@ def _make_candles(symbol: str, timeframe: str, start: datetime, periods: int, de
     return candles
 
 
+
 def _bootstrap_app(tmp_path: Path, ui_dist_path: Path | None = None):
+
+def _bootstrap_app(tmp_path: Path):
     config_path = tmp_path / "config.yaml"
     data_dir = tmp_path / "data"
     sqlite_path = data_dir / "oryon.sqlite"
@@ -54,6 +57,24 @@ def _bootstrap_app(tmp_path: Path, ui_dist_path: Path | None = None):
     if ui_dist_path is not None:
         config_lines.insert(4, f"  ui_dist_path: {ui_dist_path.as_posix()}")
     config_path.write_text("\n".join(config_lines) + "\n", encoding="utf-8")
+
+    config_path.write_text(
+        """
+defaults:
+  data_dir: {data_dir}
+  sqlite_path: {sqlite_path}
+  symbol_universe_path: {universe_path}
+  timeframes:
+    - 1h
+    - 15m
+""".format(
+            data_dir=data_dir.as_posix(),
+            sqlite_path=sqlite_path.as_posix(),
+            universe_path=universe_path.as_posix(),
+        ),
+        encoding="utf-8",
+    )
+
     app = create_app(config_path)
     resources = app.state.resources
     resources.sql_store.initialize(Path("oryon/data/storage/schema.sql"))
@@ -74,29 +95,46 @@ def test_search_history_and_analyze(tmp_path):
     app = _bootstrap_app(tmp_path)
     client = TestClient(app)
 
+
     search_resp = client.get("/api/search", params={"q": "BTC", "limit": 5})
     assert search_resp.status_code == 200
     assert any(item["symbol"] == "BTCUSDT" for item in search_resp.json())
 
     history_resp = client.get("/api/history", params={"symbol": "BTCUSDT", "timeframe": "15m", "limit": 50})
+
+    search_resp = client.get("/search", params={"q": "BTC", "limit": 5})
+    assert search_resp.status_code == 200
+    assert any(item["symbol"] == "BTCUSDT" for item in search_resp.json())
+
+    history_resp = client.get("/history", params={"symbol": "BTCUSDT", "timeframe": "15m", "limit": 50})
+
     assert history_resp.status_code == 200
     candles = history_resp.json()
     assert len(candles) <= 50
     assert "timestamp" in candles[0]
 
+
     live_resp = client.get("/api/live", params={"symbol": "BTCUSDT", "timeframe": "15m"})
+
+    live_resp = client.get("/live", params={"symbol": "BTCUSDT", "timeframe": "15m"})
+
     assert live_resp.status_code == 200
     payload = live_resp.json()
     assert payload["symbol"] == "BTCUSDT"
 
     analyze_resp = client.post(
+
         "/api/analyze",
+
+        "/analyze",
+
         json={"symbol": "BTCUSDT", "timeframes": ["1h", "15m"], "lookback": 300},
     )
     assert analyze_resp.status_code == 200
     body = analyze_resp.json()
     assert "signals" in body
     assert "generated_at" in body
+
 
 
 def test_frontend_assets_and_fallback(tmp_path):
@@ -128,3 +166,4 @@ def test_frontend_assets_and_fallback(tmp_path):
     fallback_resp = client.get("/dashboard")
     assert fallback_resp.status_code == 200
     assert "<div id='root'></div>" in fallback_resp.text
+

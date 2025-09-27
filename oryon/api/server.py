@@ -1,6 +1,7 @@
 """FastAPI application exposing Oryon services."""
 from __future__ import annotations
 
+
 import logging
 from pathlib import Path
 from typing import Any, Dict, Iterable
@@ -9,6 +10,13 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
+
+from pathlib import Path
+from typing import Any, Dict
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
 
 from oryon.api.dependencies import AppResources
 from oryon.api.routers import analyze, history, live, search
@@ -61,6 +69,11 @@ def create_app(config_path: str | Path = "oryon_config.yaml") -> FastAPI:
     for router in (search.router, history.router, live.router, analyze.router):
         app.include_router(router, prefix=api_prefix)
     _configure_frontend(app, defaults=defaults, api_prefix=str(api_prefix))
+    app.include_router(search.router)
+    app.include_router(history.router)
+    app.include_router(live.router)
+    app.include_router(analyze.router)
+
     return app
 
 
