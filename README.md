@@ -5,6 +5,7 @@ stockage hybride JSON / SQL, des pipelines d’intégration et — dans les 
 multi-timeframes, un backend API FastAPI et un frontend React. Chaque lot est livré progressivement pour rester exploitable
 en environnement limité.
 
+
 Ce dépôt contient désormais les livraisons combinées des **Lot 1 – Fondation data & configuration**, **Lot 2 – Cœur d’analyse**
 et **Lot 3 – Backend & backtesting**. Le Lot 4 finalisera l’expérience frontend.
 
@@ -19,6 +20,10 @@ et **Lot 3 – Backend & backtesting**. Le Lot 4 finalisera l’expérience 
 - Générateur de rapports HTML/CSV (`oryon/backtest/reports/report_builder.py`) et script d’exemple `run_backtest_example.py`.
 - Tests d’intégration API (FastAPI TestClient) validant la recherche de symboles, l’historique OHLCV, le flux live et le POST
   `/analyze`, plus tests unitaires pour le moteur de backtest.
+
+Ce dépôt contient les livraisons combinées des **Lot 1 – Fondation data & configuration** et **Lot 2 – Cœur d’analyse**. Les lots
+suivants étendront l’analyse, le backend et le frontend.
+
 
 ## Fonctionnalités du Lot 2
 
@@ -126,6 +131,53 @@ pytest oryon/tests/unit oryon/tests/integration -q
 
 La suite couvre les composants data, les indicateurs, le pipeline d’analyse, le moteur de backtest, les rapports et les endpoints
 FastAPI.
+```
+
+### Configuration
+
+1. Copiez `.env.example` en `.env` et adaptez les chemins si besoin.
+2. Le fichier `oryon_config.yaml` contient les chemins des dossiers de données, la TTL du cache, les connecteurs actifs et la
+   liste des timeframes. Les variables d’environnement préfixées par `ORYON_` peuvent surcharger la configuration (ex.
+   `ORYON_DEFAULTS__DATA_DIR=./data_store_custom`).
+
+### Rafraîchir des données gratuites
+
+```bash
+python -m oryon.scripts.refresh_free_data --symbol BTCUSDT --timeframe 1h --timeframe 4h
+```
+
+Ce script :
+
+1. Charge la configuration.
+2. Instancie les connecteurs disponibles et applique un cache disque + rate limit.
+3. Stocke les bougies dans `data_store/json/...`.
+4. Synchronise automatiquement la base SQLite (`data_store/oryon.sqlite`).
+
+### Construire l’univers de symboles
+
+Préparez un CSV avec les colonnes `symbol,exchange,asset_type,...`, puis :
+
+```bash
+python -m oryon.scripts.build_symbol_universe data_store/symbols.jsonl --static-csv static_symbols.csv
+```
+
+Le fichier JSONL produit est exploité par l’API et le frontend (lots ultérieurs) pour alimenter la recherche fuzzy.
+
+### Exporter des signaux (future use)
+
+Lorsque le moteur de signaux sera en place, vous pourrez exporter les signaux SQL vers CSV :
+
+```bash
+python -m oryon.scripts.export_signals_csv --output signals.csv
+```
+
+## Tests
+
+```bash
+pytest oryon/tests/unit
+```
+
+Les tests couvrent le cache disque, le rate limit, le stockage JSON/SQL, l’ETL, la configuration et les utilitaires numériques.
 
 ## Roadmap des lots suivants
 
