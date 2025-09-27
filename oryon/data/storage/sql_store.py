@@ -7,6 +7,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Iterable, List, Optional, Sequence
 
+from oryon.core.signals.signal_schema import TradingSignal
+
 from ..connectors.base import Candle
 from ..ingestion.symbol_universe import SymbolRecord
 
@@ -111,6 +113,68 @@ class SQLStore:
             )
             for row in rows
         ]
+
+    def search_symbols(self, query: str, limit: int = 10) -> List[dict]:
+        like = f"%{query.upper()}%"
+        with self.cursor() as cur:
+            cur.execute(
+                """
+                SELECT symbol, exchange, type, base, quote
+                FROM symbols
+                WHERE UPPER(symbol) LIKE ? OR UPPER(exchange) LIKE ?
+                ORDER BY symbol
+                LIMIT ?
+                """,
+                (like, like, limit),
+            )
+            rows = cur.fetchall()
+        return [
+            {
+                "symbol": row["symbol"],
+                "exchange": row["exchange"],
+                "asset_type": row["type"],
+                "base": row["base"],
+                "quote": row["quote"],
+            }
+            for row in rows
+        ]
+
+
+def store_signals(
+    store: SQLStore,
+    signals: Sequence[TradingSignal],
+    timeframe: str,
+    timestamp,
+) -> None:
+    if not signals:
+        return
+    rows = []
+    for signal in signals:
+        rows.append(
+            {
+                "id": signal.id,
+                "symbol": signal.symbol,
+                "tf_entry": timeframe,
+                "ts_entry": int(timestamp.timestamp()),
+                "direction": signal.direction,
+                "entry": signal.entry,
+                "sl": signal.stop_loss,
+                "tp1": signal.take_profits[0] if signal.take_profits else None,
+                "tp2": signal.take_profits[1] if len(signal.take_profits) > 1 else None,
+                "rr": signal.rr,
+                "score": signal.score,
+                "reasons": json_dumps([reason.__dict__ for reason in signal.reasons]),
+                "rendered": json_dumps([overlay.__dict__ for overlay in signal.overlays]),
+            }
+        )
+    with store._connection:  # noqa: SLF001 - internal usage for batch insert
+        store._connection.executemany(
+            """
+            INSERT OR REPLACE INTO signals(id, symbol, tf_entry, ts_entry, direction, entry, sl, tp1, tp2, rr, score, reasons, rendered)
+            VALUES (:id, :symbol, :tf_entry, :ts_entry, :direction, :entry, :sl, :tp1, :tp2, :rr, :score, :reasons, :rendered)
+            """,
+            rows,
+        )
 
 
 def json_dumps(value) -> str:
