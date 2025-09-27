@@ -1,0 +1,16 @@
+{
+  "symbols": [
+    { "symbol": "BTCUSDT", "exchange": "BINANCE", "asset_type": "crypto", "base": "BTC", "quote": "USDT" },
+    { "symbol": "ETHUSDT", "exchange": "BINANCE", "asset_type": "crypto", "base": "ETH", "quote": "USDT" },
+    { "symbol": "EURUSD", "exchange": "FXCM", "asset_type": "forex", "base": "EUR", "quote": "USD" },
+    { "symbol": "GBPUSD", "exchange": "FXCM", "asset_type": "forex", "base": "GBP", "quote": "USD" },
+    { "symbol": "SPX500", "exchange": "CBOE", "asset_type": "index", "base": "SPX", "quote": "USD" },
+    { "symbol": "XAUUSD", "exchange": "OANDA", "asset_type": "commodity", "base": "XAU", "quote": "USD" },
+    { "symbol": "CL=F", "exchange": "NYMEX", "asset_type": "commodity", "base": "CL", "quote": "USD" },
+    { "symbol": "NDX100", "exchange": "NASDAQ", "asset_type": "index", "base": "NDX", "quote": "USD" },
+    { "symbol": "TSLA", "exchange": "NASDAQ", "asset_type": "stock", "base": "TSLA", "quote": "USD" },
+    { "symbol": "MSFT", "exchange": "NASDAQ", "asset_type": "stock", "base": "MSFT", "quote": "USD" },
+    { "symbol": "^FCHI", "exchange": "EURONEXT", "asset_type": "index", "base": "CAC40", "quote": "EUR" },
+    { "symbol": "US10Y", "exchange": "TRESURY", "asset_type": "rates", "base": "US10Y", "quote": "USD" }
+  ]
+}

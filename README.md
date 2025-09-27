@@ -1,151 +1,165 @@
-# Omega Study Platform
+# Oryon — Local institutional-grade market signal research stack
 
-Omega Study est une plateforme académique qui combine une prise de notes vocale locale et des fonctionnalités IA à la demande pour résumer, questionner et ludifier les cours. L'objectif est de limiter l'usage payant d'API en stockant uniquement le texte transcrit et en n'appelant l'IA que lorsque l'utilisateur le demande.
+Oryon est une plateforme de recherche de signaux de trading 100 % locale. Elle combine des connecteurs de données gratuits, un
+stockage hybride JSON / SQL, des pipelines d’intégration et — dans les lots futurs — des moteurs d’analyse technique
+multi-timeframes, un backend API FastAPI et un frontend React. Chaque lot est livré progressivement pour rester exploitable
+en environnement limité.
 
-## Aperçu des fonctionnalités
+Ce dépôt contient désormais les livraisons combinées des **Lot 1 – Fondation data & configuration**, **Lot 2 – Cœur d’analyse**,
+**Lot 3 – Backend & backtesting** et **Lot 4 – Frontend React**.
 
-- **Capture vocale côté navigateur** grâce à l'API Web Speech, sans stockage de fichiers audio volumineux.
+## Fonctionnalités du Lot 4
 
-- **Éditeur de notes en temps réel** avec statistiques, tags contextuels et sauvegarde locale automatique.
-- **Outils IA à la carte** : résumé, quiz, réponses aux questions et mini-jeux pédagogiques. Chaque outil ne contacte le backend qu'à la demande et met en cache ses réponses pour économiser les crédits IA.
-- **Fallback local intelligent** lorsque le serveur IA est indisponible : résumés simplifiés, quiz générés via heuristiques et conseils d'auto-révision.
-- **Exports instantanés** en Markdown ou JSON pour partager vos notes.
+- Application Vite + React + Tailwind (`ui/`) avec thème sombre futuriste, overlays néon et police locale préchargée.
+- Composants modulaires : barre de recherche fuzzy avec suggestions multi-actifs, panneau d’analyse, carte de signaux, toggles de
+  calques et toaster de notifications.
+- Graphique Lightweight Charts en temps quasi réel affichant les bougies, les niveaux trade (entrée/SL/TP) et les annotations de
+  liquidité / order blocks selon les calques activés.
+- Connexion directe au backend FastAPI (`/api/search`, `/api/history`, `/api/live`, `/api/analyze`) avec polling live et contrôles d’erreurs.
+- Index symboles local (`symbols-demo.json`) pour un mode démo hors-ligne et enrichissement automatique via l’API.
 
-- **Éditeur de notes en temps réel** avec statistiques de mots et synchronisation avec la transcription.
-- **Sauvegarde côté serveur** (Node.js/Express) dans un fichier JSON léger pour éviter une base de données coûteuse.
-- **Outils IA à la carte** : résumé, quiz, réponses aux questions et mini-jeux pédagogiques.
-- **Stratégies d'optimisation des coûts** :
-  - Résumés et quiz locaux (fallback) lorsque la clé OpenAI est absente ou que le texte est court.
-  - Mise en cache des réponses IA sur le serveur pour éviter des appels redondants.
-  - Possibilité de chunker les transcripts avant envoi à l'IA pour contrôler la consommation de tokens.
+## Fonctionnalités du Lot 3
 
+- API FastAPI locale (`oryon/api/server.py`) exposant les endpoints `/api/search`, `/api/history`, `/api/live` et `/api/analyze` avec sécurité CORS
+  restreinte aux origines locales.
+- Dépendances backend mutualisées via `AppResources` (pipeline multi-timeframe, loader JSON/SQL, univers de symboles).
+- Persistences des signaux dans SQLite (`signals` table) pour audit trail des analyses.
+- Moteur de backtesting `WalkForwardBacktester` avec évaluation pas-à-pas, calculs de RR réalisés et extraction des métriques
+  (`BacktestMetrics`).
+- Générateur de rapports HTML/CSV (`oryon/backtest/reports/report_builder.py`) et script d’exemple `run_backtest_example.py`.
+- Tests d’intégration API (FastAPI TestClient) validant la recherche de symboles, l’historique OHLCV, le flux live et le POST
+  `/analyze`, plus tests unitaires pour le moteur de backtest.
 
-## Structure du projet
+## Fonctionnalités du Lot 2
 
-```
-backend/   → API Express, stockage des sessions, intégration OpenAI optionnelle
-frontend/  → Interface HTML/CSS/JS autonome (aucune étape de build nécessaire)
-```
+- Tout le socle du Lot 1 (ingestion multi-sources gratuites, stockage JSON/SQLite, scripts utilitaires et tests).
+- Moteur d’analyse multi-timeframes avec détection de swings adaptatifs, BOS/CHOCH, order blocks, fair value gaps, turtle soup
+  et niveaux de liquidité (equal highs/lows, sessions, daily hi/lo) synchronisés aux indicateurs.
+- Suite d’indicateurs vectorisés (moyennes mobiles, momentum RSI/MACD/Stochastique, volatilité ATR/percentile, patterns chandeliers,
+  Fibonacci) et microstructure (delta volume).
+- Détection de régime de marché (trend/range) avec Hurst exponent, clustering KMeans et percentiles de volatilité.
+- Pipeline complet `AnalyzeAssetPipeline` qui agrège les confluences, calcule le risk/reward, calibre un score normalisé et produit des
+  signaux explicables avec overlays (order blocks, zones de liquidité).
+- Filtres de risque (volatilité, liquidité), post-traitement (déduplication, quality gate) et générateur de signaux prêt pour les lots
+  backend/front.
+- Tests unitaires ciblant les zones de liquidité, BOS/CHOCH, order blocks et la calibration des scores, plus un test d’intégration du
+  pipeline complet.
 
-## Utilisation de l'interface
+## Fonctionnalités du Lot 1
 
-1. Ouvrez simplement `frontend/index.html` dans votre navigateur (double-clic ou « Ouvrir avec Live Server »). Aucun bundler n'est requis.
-2. Cliquez sur « Commencer l'enregistrement » pour déclencher la reconnaissance vocale (Chrome recommandé). Les notes sont nettoyées en direct et enrichies de suggestions d'actions.
-3. Utilisez les boutons de la section « Analyse IA à la demande » pour générer résumé, quiz, réponses et jeux. En l'absence de backend, une version locale vous est proposée pour continuer à travailler sans attendre.
-4. Ajoutez des tags contextuels, suivez les statistiques automatiques et exportez vos notes en Markdown ou JSON.
+- Structure de dépôt complète (`oryon/`) avec configuration (`pyproject.toml`, `oryon_config.yaml`, `.env.example`, `LICENSE`).
+- Connecteurs gratuits : Yahoo Finance, Stooq, ccxt (Binance), REST Binance public et lecture CSV locale.
+- Gestion du cache disque et du rate limit avec file d’ingestion orchestrée par un `FetchScheduler`.
+- Stockage hybride :
+  - JSON append-only avec snapshots périodiques.
+  - Base SQLite initialisée via `schema.sql` et synchronisation ETL JSON→SQL.
+- Utilitaires communs (journalisation, chargement de configuration, maths/statistiques, parallélisme, outils temporels).
+- Scripts CLI : construction d’univers de symboles, rafraîchissement des données gratuites, export CSV des signaux.
+- Tests unitaires couvrant cache, rate limit, stockage, ETL, config, statistiques et ordonnancement d’ingestion.
 
-> 💡 L'autosauvegarde locale conserve votre travail même en cas de fermeture d'onglet.
+## Prise en main rapide
 
-## Configuration du backend (optionnelle)
-
-Le backend Express reste disponible pour stocker les sessions et déléguer les analyses IA complètes.
-
-1. Installez les dépendances côté backend :
-
-   ```bash
-   cd backend
-   npm install
-   ```
-
-   > Si le registre npm est restreint dans votre environnement, configurez `npm config set registry https://registry.npmjs.org/` ou un miroir autorisé.
-
-2. Créez le fichier `.env` depuis l'exemple et ajoutez votre clé OpenAI :
-
-   ```bash
-   cp .env.example .env
-   # puis éditez .env pour y placer OPENAI_API_KEY=...
-   ```
-
-3. Lancez le serveur :
-
-   ```bash
-   npm run dev
-   ```
-
-4. Les appels IA resteront facultatifs : sans clé, le serveur emploie des algorithmes locaux pour fournir des résultats basiques. L'interface détecte automatiquement la présence du backend et profite de la mise en cache côté serveur.
-
-## Déploiement
-
-- **Frontend** : il s'agit d'un bundle statique. Publiez simplement le dossier `frontend/` (ou son contenu) sur un hébergement statique, un CDN ou même un dossier partagé.
-- **Backend** : déployez `backend/` sur la plateforme de votre choix (Railway, Render, Fly.io, VPS…) en veillant à configurer `OPENAI_API_KEY` et un stockage persistant pour `backend/data/sessions.json`.
-
-## Notes sur la confidentialité
-
-- Les enregistrements vocaux ne quittent jamais le navigateur : seul le texte transcrit est stocké.
-- Les appels IA ne sont déclenchés qu'à la demande explicite de l'utilisateur et profitent d'une mise en cache pour limiter la facture.
-frontend/  → Interface Vite + React
-```
-
-## Pré-requis
-
-- Node.js 18+
-- (Optionnel) Une clé API OpenAI disponible dans `backend/.env`
-
-## Installation
+### Installation
 
 ```bash
-# Installer les dépendances côté backend
-cd backend
+python -m venv .venv
+source .venv/bin/activate
+pip install -e .
+```
+
+### Configuration
+
+1. Copiez `.env.example` en `.env` et adaptez les chemins si besoin.
+2. Le fichier `oryon_config.yaml` contient les chemins des dossiers de données, la TTL du cache, les connecteurs actifs et la
+   liste des timeframes. Les variables d’environnement préfixées par `ORYON_` peuvent surcharger la configuration (ex.
+   `ORYON_DEFAULTS__DATA_DIR=./data_store_custom`). Les clés `api_prefix` et `ui_dist_path` permettent de modifier le préfixe
+   des routes exposées et le dossier statique servi pour la SPA construite.
+
+### Rafraîchir des données gratuites
+
+```bash
+python -m oryon.scripts.refresh_free_data --symbol BTCUSDT --timeframe 1h --timeframe 4h
+```
+
+Ce script :
+
+1. Charge la configuration.
+2. Instancie les connecteurs disponibles et applique un cache disque + rate limit.
+3. Stocke les bougies dans `data_store/json/...`.
+4. Synchronise automatiquement la base SQLite (`data_store/oryon.sqlite`).
+
+### Construire l’univers de symboles
+
+Préparez un CSV avec les colonnes `symbol,exchange,asset_type,...`, puis :
+
+```bash
+python -m oryon.scripts.build_symbol_universe data_store/symbols.jsonl --static-csv static_symbols.csv
+```
+
+Le fichier JSONL produit est exploité par l’API et le frontend (lots ultérieurs) pour alimenter la recherche fuzzy.
+
+### Exporter des signaux (future use)
+
+Lorsque le moteur de signaux sera en place, vous pourrez exporter les signaux SQL vers CSV :
+
+```bash
+python -m oryon.scripts.export_signals_csv --output signals.csv
+```
+
+## Lancer le backend FastAPI
+
+```bash
+uvicorn oryon.api.server:app --reload
+```
+
+L’API consomme la configuration `oryon_config.yaml`. Une fois le serveur démarré, vous pouvez tester :
+
+- `GET http://127.0.0.1:8000/api/search?q=BTC` pour l’auto-suggest de symboles.
+- `GET http://127.0.0.1:8000/api/history?symbol=BTCUSDT&timeframe=15m&limit=200` pour récupérer les bougies.
+- `GET http://127.0.0.1:8000/api/live?symbol=BTCUSDT&timeframe=1m` pour la dernière bougie disponible.
+- `POST http://127.0.0.1:8000/api/analyze` avec `{ "symbol": "BTCUSDT", "timeframes": ["1h", "15m"], "lookback": 600 }` pour
+  déclencher le pipeline et obtenir des signaux explicables.
+
+## Lancer l'interface Lot 4
+
+```bash
+cd ui
 npm install
-
-# Installer les dépendances côté frontend
-cd ../frontend
-npm install
-```
-
-> 💡 Si le registre npm est restreint dans votre environnement, configurez `npm config set registry https://registry.npmjs.org/` ou un miroir autorisé.
-
-## Configuration
-
-1. Copier le fichier d'exemple et renseigner la clé API si vous souhaitez activer l'IA OpenAI.
-
-```bash
-cd backend
-cp .env.example .env
-# puis éditer .env pour y placer OPENAI_API_KEY=...
-```
-
-2. Les appels IA restent facultatifs : sans clé, le serveur emploie des algorithmes locaux pour fournir des résultats basiques.
-
-## Lancer les services
-
-Dans deux terminaux séparés :
-
-```bash
-# Terminal 1 - backend
-cd backend
-npm run dev
-
-# Terminal 2 - frontend
-cd frontend
 npm run dev
 ```
 
-Le frontend est accessible sur http://localhost:5173 et proxe automatiquement les requêtes `/api` vers l'API Express sur http://localhost:4000.
-
-## Tests et qualité
-
-- `npm run lint` dans `backend/` vérifie le style de code serveur.
-- Un linter React peut être ajouté côté frontend selon vos préférences.
-
-## Déploiement
-
-Pour un déploiement léger :
-
-1. Construire le frontend :
+Le serveur Vite se lance sur `http://127.0.0.1:5173` (configurable via `VITE_DEV_PORT`). Les requêtes `/api/*` sont proxyées vers
+FastAPI. Pour un build statique :
 
 ```bash
-cd frontend
 npm run build
 ```
 
-2. Servir le dossier généré `frontend/dist` via un CDN ou un serveur statique (ex. Nginx).
-3. Héberger le backend (Railway, Render, Fly.io, VPS) en veillant à configurer `OPENAI_API_KEY` et un stockage persistant pour `backend/data/sessions.json`.
+Le dossier `ui/dist` contient les assets prêts à être servis (copiables sur un simple serveur de fichiers).
 
-## Notes sur la confidentialité
+## Backtesting walk-forward
 
-- Les enregistrements vocaux ne quittent jamais le navigateur : seul le texte transcrit est transmis au serveur.
-- Les appels IA ne sont déclenchés qu'à la demande explicite de l'utilisateur.
+```bash
+python -m oryon.backtest.examples.run_backtest_example --symbol BTCUSDT
+```
 
+Le script charge les données locales JSON/SQLite, exécute le `WalkForwardBacktester` et produit un rapport HTML/CSV dans
+`backtest_reports/`.
 
-Bon apprentissage avec Omega Study !
+## Tests
+
+```bash
+pytest oryon/tests/unit oryon/tests/integration -q
+```
+
+La suite couvre les composants data, les indicateurs, le pipeline d’analyse, le moteur de backtest, les rapports et les endpoints
+FastAPI.
+
+## Roadmap des lots suivants
+
+1. **Lot 2 – Cœur d’analyse** : structure de marché, indicateurs, risk management, pipeline multi-timeframe et signaux
+   explicables.
+2. **Lot 3 – Backend & backtesting** : API FastAPI locale, moteur de backtesting et rapports.
+3. **Lot 4 – Frontend React** : interface sombre futuriste avec graphe en temps réel, overlays et recherche fuzzy.
+
+Chaque lot reste local, sans clés API payantes et avec une documentation d’installation actualisée.
