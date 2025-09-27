@@ -5,8 +5,23 @@ stockage hybride JSON / SQL, des pipelines d’intégration et — dans les 
 multi-timeframes, un backend API FastAPI et un frontend React. Chaque lot est livré progressivement pour rester exploitable
 en environnement limité.
 
-Ce dépôt contient la livraison du **Lot 1 – Fondation data & configuration**. Les lots suivants étendront l’analyse, le backend
-et le frontend.
+Ce dépôt contient les livraisons combinées des **Lot 1 – Fondation data & configuration** et **Lot 2 – Cœur d’analyse**. Les lots
+suivants étendront l’analyse, le backend et le frontend.
+
+## Fonctionnalités du Lot 2
+
+- Tout le socle du Lot 1 (ingestion multi-sources gratuites, stockage JSON/SQLite, scripts utilitaires et tests).
+- Moteur d’analyse multi-timeframes avec détection de swings adaptatifs, BOS/CHOCH, order blocks, fair value gaps, turtle soup
+  et niveaux de liquidité (equal highs/lows, sessions, daily hi/lo) synchronisés aux indicateurs.
+- Suite d’indicateurs vectorisés (moyennes mobiles, momentum RSI/MACD/Stochastique, volatilité ATR/percentile, patterns chandeliers,
+  Fibonacci) et microstructure (delta volume).
+- Détection de régime de marché (trend/range) avec Hurst exponent, clustering KMeans et percentiles de volatilité.
+- Pipeline complet `AnalyzeAssetPipeline` qui agrège les confluences, calcule le risk/reward, calibre un score normalisé et produit des
+  signaux explicables avec overlays (order blocks, zones de liquidité).
+- Filtres de risque (volatilité, liquidité), post-traitement (déduplication, quality gate) et générateur de signaux prêt pour les lots
+  backend/front.
+- Tests unitaires ciblant les zones de liquidité, BOS/CHOCH, order blocks et la calibration des scores, plus un test d’intégration du
+  pipeline complet.
 
 ## Fonctionnalités du Lot 1
 
